@@ -13,14 +13,16 @@ import UIKit
 class CoreVisonWrapper {
     private var requests = [VNRequest]()
     private var imageSize = CGSize.zero
-    private var processedImageCompletion: (([Any]) -> Void)? = nil
-    private var imageFixedOrientation: UIImage!
+    private var processedImageCompletion: (([[UIImage]]) -> Void)? = nil
+    private var imageInput: UIImage!
     
     init() {
         setupVision()
     }
     
-    func processImage(from input: UIImage) {
+    private func processImage(from input: UIImage) {
+        imageSize = input.size
+        imageInput = input
         let requestOptions:[VNImageOption : Any] = [:]
         let imageRequestHandler = VNImageRequestHandler(cgImage: input.cgImage!, options: requestOptions)
         do {
@@ -31,33 +33,36 @@ class CoreVisonWrapper {
     }
     
     // MARK: - Vision Setup
-    func setupVision() {
+    private func setupVision() {
         let textRequest = VNDetectTextRectanglesRequest(completionHandler: self.textDetectionHandler)
         textRequest.reportCharacterBoxes = true
         
         self.requests = [textRequest]
     }
     
-    func textDetectionHandler(request: VNRequest, error: Error?) {
+    private func textDetectionHandler(request: VNRequest, error: Error?) {
         guard let observations = request.results else {print("no result"); return}
         let result = observations.map({$0 as? VNTextObservation})
-        var rectArray = [NSValue](), imageProcessedArray = [UIImage]()
+        var imageArray = [[UIImage]]()
         for region in result {
             guard let rg = region else {continue}
-            let rect = getRegionBox(box: rg)
+            var characterImageArray = [UIImage]()
             if let boxes = rg.characterBoxes {
                 for characterBox in boxes {
-                    self.getTextBox(box: characterBox)
+                    let characterRegion = self.getTextBox(box: characterBox)
+                    let characterImage = self.imageInput.getImageRegion(with: characterRegion)
+                    characterImageArray.append(characterImage)
                 }
             }
+            imageArray.append(characterImageArray)
         }
         if let comletionClosure = processedImageCompletion {
-            comletionClosure([imageFixedOrientation, imageProcessedArray, rectArray])
+            comletionClosure(imageArray)
         }
     }
     
     // MARK: - Get region box
-    func getRegionBox(box: VNTextObservation) -> CGRect {
+    private func getRegionBox(box: VNTextObservation) -> CGRect {
         guard let boxes = box.characterBoxes else {return CGRect.zero}
         var xMin: CGFloat = 9999.0
         var xMax: CGFloat = 0.0
@@ -81,18 +86,22 @@ class CoreVisonWrapper {
         return CGRect(x: xCoord, y: yCoord, width: width, height: height)
     }
     
-    func getTextBox(box: VNRectangleObservation) -> CGRect {
-        let xCoord = box.topLeft.x * imageSize.width
-        let yCoord = (1 - box.topLeft.y) * imageSize.height
-        let width = (box.topRight.x - box.bottomLeft.x) * imageSize.width
-        let height = (box.topLeft.y - box.bottomLeft.y) * imageSize.height
+    private func getTextBox(box: VNRectangleObservation) -> CGRect {
+        let margin: CGFloat = 2
         
-        return CGRect(x: xCoord, y: yCoord, width: width, height: height)
+        let xCoord = box.topLeft.x * imageSize.width - margin / 2
+        let yCoord = (1 - box.topLeft.y) * imageSize.height - margin / 2
+        let width = (box.topRight.x - box.bottomLeft.x) * imageSize.width + margin
+        let height = (box.topLeft.y - box.bottomLeft.y) * imageSize.height + margin
+        
+        return CGRect(x: xCoord,
+                      y: yCoord,
+                      width: width,
+                      height: height)
     }
     
-    func processImage(from input: UIImage!, completionHandler completion: (([Any]?) -> Void)!) {
+    func processImage(from input: UIImage!, completionHandler completion: (([[UIImage]]) -> Void)!) {
         processedImageCompletion = completion
-        imageSize = input.size
         processImage(from: input)
     }
 }
