@@ -15,8 +15,6 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let testImage = #imageLiteral(resourceName: "India")
-        showTestPreprocessImage(image: testImage)
     }
     
     private func showTestPreprocessImage(image: UIImage) {
@@ -27,6 +25,8 @@ class ViewController: UIViewController {
                 print("================================")
                 for ch in w {
                     print("--> prediction result: \(self?.mlModel.predict(image: ch) ?? "nothing")")
+                    
+                    UIImageWriteToSavedPhotosAlbum(ch, nil, nil, nil)
                     
                     let chImageView = UIImageView(image: ch)
                     chImageView.frame.origin = CGPoint(x: xValue,
@@ -40,12 +40,17 @@ class ViewController: UIViewController {
     }
 
     // Actions
-    private func takePhotoTouched() {
+    private func openCamera() {
         let imagePicker = UIImagePickerController()
         imagePicker.sourceType = .camera
         imagePicker.delegate = self
         imagePicker.allowsEditing = true
         present(imagePicker, animated: true, completion: nil)
+    }
+    
+    // Button actions
+    @IBAction func takePhotoButtonAction() {
+        openCamera()
     }
 }
 
@@ -55,9 +60,9 @@ extension ViewController: UIImagePickerControllerDelegate, UINavigationControlle
     }
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
-        dismiss(animated: true) {
+        dismiss(animated: true) { [weak self] in
             if let image = info[UIImagePickerControllerEditedImage] as? UIImage {
-                
+                self?.showTestPreprocessImage(image: image)
             }
         }
     }
